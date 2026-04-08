@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Ralph loop artifacts (when testing in this repo)
+.ralph/
+IMPLEMENTATION_PLAN.md
+loop.sh
+AGENTS.md

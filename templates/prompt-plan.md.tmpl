@@ -1,0 +1,55 @@
+You are planning an implementation. Read the codebase and generate IMPLEMENTATION_PLAN.md.
+
+## Goal
+
+{{PROJECT_GOAL}}
+
+## Task Source
+
+Check `.ralph/config.sh` for the task source configuration:
+
+**If `RALPH_VIKUNJA_TASK_ID` is set** (Vikunja-sourced plan):
+1. Use the Vikunja MCP tools to fetch the parent task: `tasks_get(taskId=RALPH_VIKUNJA_TASK_ID)`.
+2. Read the parent task's description, comments, and related subtasks (returned in `related_tasks.parenttask`).
+3. Use the subtask descriptions as the authoritative scope — each subtask becomes a section in IMPLEMENTATION_PLAN.md.
+4. Explore the codebase to understand existing architecture and fill in specific files, actions, and verify commands for each subtask.
+5. Preserve the Vikunja task IDs in the plan (e.g., `### Task 1: Phase title [vikunja:#238]`).
+6. If a subtask's description includes a "Definition of done", use it as the verify criteria.
+7. Respect blocking/blocked relations — blocked tasks go later in the plan.
+
+**If `RALPH_VIKUNJA_TASK_ID` is NOT set** (standalone plan):
+1. Explore the codebase to understand existing architecture, patterns, and conventions.
+2. Break the goal into small, independently verifiable tasks.
+3. Order tasks by dependency (foundation first, then features, then polish).
+
+## Instructions
+
+Write IMPLEMENTATION_PLAN.md at the project root with this format:
+
+```markdown
+# Implementation Plan
+
+## Goal
+{{PROJECT_GOAL}}
+
+## Tasks
+
+### Task N: [Title] [vikunja:#ID]
+- **Files:** path/to/file.ts, path/to/other.ts
+- **Action:** What to do (specific, actionable)
+- **Verify:** `command to verify` (build, test, curl, etc.)
+- **Parallel:** true/false (true if no file overlap with adjacent tasks)
+- **Status:** [ ] Pending
+```
+
+The `[vikunja:#ID]` tag is only included when sourced from Vikunja. It links each plan task to its Vikunja subtask for completion sync.
+
+4. Aim for 5-15 tasks. Each task should be completable in one iteration.
+5. Commit IMPLEMENTATION_PLAN.md and push.
+
+6. Check `.ralph/config.sh` for `RALPH_COMPLETION_PROMISE`. If set, include it in
+   IMPLEMENTATION_PLAN.md under a `## Completion Promise` section so the build
+   prompt knows what to verify at the end.
+
+99. Do NOT implement anything. Planning only.
+999. After writing the plan, output: RALPH_COMPLETE

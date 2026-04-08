@@ -1,0 +1,77 @@
+0a. Read `.ralph/config.sh` to load project configuration.
+0b. Read `.ralph/learnings.md` for codebase patterns and signs from prior iterations.
+0c. Study @IMPLEMENTATION_PLAN.md to find the next incomplete task (if it exists).
+0d. Study @AGENTS.md for build/test commands and key architecture.
+0e. Read the relevant source files BEFORE editing anything.
+0f. If `RALPH_VIKUNJA_TASK_ID` is set in config, fetch the parent task
+    via Vikunja MCP (`tasks_get`) to get the latest subtask state and comments.
+    Use this to confirm scope and check for any updates since the plan was written.
+
+1. Choose the most important incomplete task from @IMPLEMENTATION_PLAN.md.
+   Prefer tasks whose dependencies are already complete.
+   If no IMPLEMENTATION_PLAN.md exists, work directly toward the ULTIMATE GOAL.
+
+2. IMPLEMENT the task.
+   Check `RALPH_TDD` in `.ralph/config.sh`. If `true`, follow TDD workflow:
+
+   2a. RED — Write a failing test FIRST that describes the expected behavior.
+       Run `{{TEST_CMD}}` and verify the new test FAILS.
+   2b. GREEN — Write the minimum implementation to make the test pass.
+       Run `{{TEST_CMD}}` and verify it PASSES.
+   2c. IMPROVE — Refactor the implementation. Tests must stay green.
+       Cover edge cases: null/undefined, empty inputs, invalid types, boundaries, error paths.
+       Target 80%+ coverage for the code you wrote.
+
+   If `RALPH_TDD` is `false` or unset, implement directly.
+
+   Maximize parallelism:
+   - Use parallel subagents for independent file changes.
+   - Do NOT parallelize tasks that share files or have ordering dependencies.
+
+3. After implementing, run validation:
+   {{BUILD_CMD}}
+   {{TEST_CMD}}
+   {{LINT_CMD}}
+
+3b. BROWSER VERIFICATION via Playwright MCP (conditional):
+    Check `RALPH_PLAYWRIGHT` in `.ralph/config.sh`. If `true`:
+    - Ensure the dev server is running (use `RALPH_DEV_CMD`/`RALPH_DEV_PORT` from config)
+    - Call `mcp__playwright__browser_navigate` to open `http://localhost:RALPH_DEV_PORT`
+    - Call `mcp__playwright__browser_snapshot` to get the page accessibility tree — verify
+      the page renders without errors and key elements are present
+    - Call `mcp__playwright__browser_console_messages` — check for JS errors or warnings
+    - If the task changed UI-visible behavior, navigate to the affected page and verify
+      the change is reflected (use `browser_click`, `browser_snapshot` as needed)
+    - If any browser check fails, fix the issue before proceeding
+    Skip this step entirely if `RALPH_PLAYWRIGHT` is `false` or unset.
+
+4. When a task passes all validation:
+   - Mark it [x] Complete in @IMPLEMENTATION_PLAN.md (if using a plan)
+   - Move it to the Completed section
+   - Commit with a descriptive message and push
+   - If the task has a `[vikunja:#ID]` tag, also mark the Vikunja subtask complete
+     via MCP: `tasks_complete(taskId=ID)`
+
+5. If validation fails, fix the issue before moving on.
+   Do NOT skip broken tasks. Do NOT push broken code.
+
+99. After each task, append to `.ralph/learnings.md`:
+    - Under **Codebase Patterns**: any conventions, helpers, or existing code discovered
+    - Under **Signs**: any mistakes made and the constraint to prevent them
+      Format: `- **Sign:** [constraint] — discovered iteration N ([what went wrong])`
+    Keep entries concise. Never delete existing entries.
+
+999. Keep @AGENTS.md under 60 lines. Update Operational Notes with learnings.
+
+9998. After ALL tasks in @IMPLEMENTATION_PLAN.md are complete, output: RALPH_COMPLETE
+
+9999. COMPLETION PROMISE (read `RALPH_COMPLETION_PROMISE` from `.ralph/config.sh`):
+      If a completion promise is set, you may ONLY exit the loop by outputting
+      `<promise>EXACT PROMISE TEXT</promise>` when the statement is completely and
+      genuinely true. Do NOT output a false promise to escape the loop, even if
+      you think you are stuck. The promise is verified literally — it must match
+      the configured text exactly.
+      If both a task plan AND a promise are set, ALL tasks must be complete AND
+      the promise must be true before outputting <promise>.
+
+ULTIMATE GOAL: {{PROJECT_GOAL}}

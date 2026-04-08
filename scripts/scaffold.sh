@@ -163,9 +163,9 @@ if [ -f "package.json" ]; then
     TEST_CMD="npm test"
     LINT_CMD="npm run lint"
     # Check for specific scripts
-    if grep -q '"check"\s*:' package.json 2>/dev/null; then
+    if grep -q '"check"[[:space:]]*:' package.json 2>/dev/null; then
         LINT_CMD="npm run check"
-    elif grep -q '"typecheck"\s*:' package.json 2>/dev/null; then
+    elif grep -q '"typecheck"[[:space:]]*:' package.json 2>/dev/null; then
         LINT_CMD="npm run lint && npm run typecheck"
     fi
 elif [ -f "Cargo.toml" ]; then

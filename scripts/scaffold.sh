@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "WARNING: Unknown argument: $1"
+            echo "WARNING: Unknown argument: $1 (if this is a value for a preceding flag, check the flag name)"
             WARNINGS+=("Unknown argument '$1' was ignored")
             shift
             ;;
@@ -128,7 +128,8 @@ fi
 
 # --- Fill in Vikunja task ID if provided ---
 if [ -n "$VIKUNJA_TASK_ID" ]; then
-    sed -i "s|RALPH_VIKUNJA_TASK_ID=\"\"|RALPH_VIKUNJA_TASK_ID=\"$VIKUNJA_TASK_ID\"|g" .ralph/config.sh
+    export VIKUNJA_TASK_ID
+    perl -pi -e 's/RALPH_VIKUNJA_TASK_ID=""/qq{RALPH_VIKUNJA_TASK_ID="$ENV{VIKUNJA_TASK_ID}"}/e' .ralph/config.sh
     echo "[+] Set Vikunja parent task ID: #$VIKUNJA_TASK_ID"
 fi
 
@@ -141,13 +142,13 @@ fi
 
 # --- Enable TDD mode if requested ---
 if [ "$TDD" = "true" ]; then
-    sed -i "s|RALPH_TDD=\"false\"|RALPH_TDD=\"true\"|g" .ralph/config.sh
+    perl -pi -e 's/RALPH_TDD="false"/RALPH_TDD="true"/g' .ralph/config.sh
     echo "[+] TDD mode enabled (Red-Green-Refactor workflow)"
 fi
 
 # --- Enable Playwright browser verification if requested ---
 if [ "$PLAYWRIGHT" = "true" ]; then
-    sed -i "s|RALPH_PLAYWRIGHT=\"false\"|RALPH_PLAYWRIGHT=\"true\"|g" .ralph/config.sh
+    perl -pi -e 's/RALPH_PLAYWRIGHT="false"/RALPH_PLAYWRIGHT="true"/g' .ralph/config.sh
     echo "[+] Playwright browser verification enabled"
 fi
 
@@ -162,11 +163,10 @@ if [ -f "package.json" ]; then
     TEST_CMD="npm test"
     LINT_CMD="npm run lint"
     # Check for specific scripts
-    if grep -q '"typecheck"' package.json 2>/dev/null; then
-        LINT_CMD="npm run lint && npm run typecheck"
-    fi
     if grep -q '"check"' package.json 2>/dev/null; then
         LINT_CMD="npm run check"
+    elif grep -q '"typecheck"' package.json 2>/dev/null; then
+        LINT_CMD="npm run lint && npm run typecheck"
     fi
 elif [ -f "Cargo.toml" ]; then
     BUILD_CMD="cargo build"
@@ -195,14 +195,18 @@ elif [ -f "Makefile" ]; then
 fi
 
 if [ -n "$BUILD_CMD" ]; then
-    sed -i "s|{{BUILD_CMD}}|$BUILD_CMD|g" .ralph/prompt-build.md
-    sed -i "s|{{TEST_CMD}}|$TEST_CMD|g"   .ralph/prompt-build.md
-    sed -i "s|{{LINT_CMD}}|$LINT_CMD|g"   .ralph/prompt-build.md
+    export BUILD_CMD TEST_CMD LINT_CMD
+    perl -pi -e 's/\{\{BUILD_CMD\}\}/$ENV{BUILD_CMD}/g' .ralph/prompt-build.md
+    perl -pi -e 's/\{\{TEST_CMD\}\}/$ENV{TEST_CMD}/g'   .ralph/prompt-build.md
+    perl -pi -e 's/\{\{LINT_CMD\}\}/$ENV{LINT_CMD}/g'   .ralph/prompt-build.md
     echo "[+] Auto-detected commands: build=$BUILD_CMD test=$TEST_CMD lint=$LINT_CMD"
 else
-    sed -i "s|{{BUILD_CMD}}|echo 'No build command configured -- edit .ralph/prompt-build.md'|g" .ralph/prompt-build.md
-    sed -i "s|{{TEST_CMD}}|echo 'No test command configured -- edit .ralph/prompt-build.md'|g"   .ralph/prompt-build.md
-    sed -i "s|{{LINT_CMD}}|echo 'No lint command configured -- edit .ralph/prompt-build.md'|g"   .ralph/prompt-build.md
+    export BUILD_CMD="echo 'No build command configured -- edit .ralph/prompt-build.md'"
+    export TEST_CMD="echo 'No test command configured -- edit .ralph/prompt-build.md'"
+    export LINT_CMD="echo 'No lint command configured -- edit .ralph/prompt-build.md'"
+    perl -pi -e 's/\{\{BUILD_CMD\}\}/$ENV{BUILD_CMD}/g' .ralph/prompt-build.md
+    perl -pi -e 's/\{\{TEST_CMD\}\}/$ENV{TEST_CMD}/g'   .ralph/prompt-build.md
+    perl -pi -e 's/\{\{LINT_CMD\}\}/$ENV{LINT_CMD}/g'   .ralph/prompt-build.md
     echo "[!] Could not auto-detect build commands. Edit .ralph/prompt-build.md manually."
 fi
 

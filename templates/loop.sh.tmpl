@@ -120,6 +120,15 @@ fi
 
 # --- Clean command ---
 if [ "${1:-}" = "clean" ]; then
+    if [ -d "$STATE_DIR/loop.lock" ]; then
+        LOCK_PID=$(cat "$STATE_DIR/loop.lock/pid" 2>/dev/null || echo "")
+        if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+            echo "WARNING: A Ralph loop is currently running (PID $LOCK_PID)."
+            echo "         Cleaning now will break the running loop."
+            echo "         Kill it first: kill $LOCK_PID"
+            exit 1
+        fi
+    fi
     if [ "${2:-}" = "--all" ]; then
         rm -rf .ralph/ IMPLEMENTATION_PLAN.md
         echo "Removed .ralph/, IMPLEMENTATION_PLAN.md, and learnings."

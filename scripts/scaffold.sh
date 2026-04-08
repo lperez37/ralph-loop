@@ -129,14 +129,14 @@ fi
 # --- Fill in Vikunja task ID if provided ---
 if [ -n "$VIKUNJA_TASK_ID" ]; then
     export VIKUNJA_TASK_ID
-    perl -pi -e 's/RALPH_VIKUNJA_TASK_ID=""/qq|RALPH_VIKUNJA_TASK_ID="$ENV{VIKUNJA_TASK_ID}"|/e' .ralph/config.sh
+    perl -pi -e 's/RALPH_VIKUNJA_TASK_ID=""/qq~RALPH_VIKUNJA_TASK_ID="$ENV{VIKUNJA_TASK_ID}"~/e' .ralph/config.sh
     echo "[+] Set Vikunja parent task ID: #$VIKUNJA_TASK_ID"
 fi
 
 # --- Fill in completion promise if provided ---
 if [ -n "$COMPLETION_PROMISE" ]; then
     export COMPLETION_PROMISE
-    perl -pi -e 's/RALPH_COMPLETION_PROMISE=""/qq|RALPH_COMPLETION_PROMISE="$ENV{COMPLETION_PROMISE}"|/e' .ralph/config.sh
+    perl -pi -e 's/RALPH_COMPLETION_PROMISE=""/qq~RALPH_COMPLETION_PROMISE="$ENV{COMPLETION_PROMISE}"~/e' .ralph/config.sh
     echo "[+] Set completion promise: $COMPLETION_PROMISE"
 fi
 

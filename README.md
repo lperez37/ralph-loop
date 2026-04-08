@@ -317,17 +317,6 @@ The loop exits when it detects one of these (checked each iteration, in order):
 3. **Max iterations** -- reached `MAX_ITERATIONS`
 4. **Circuit breaker** -- `RALPH_MAX_STALL` consecutive iterations with no git changes
 
-## Legacy migration
-
-If you have an older Ralph setup (`.ralph-config`, `PROMPT_build.md` at root, `.ralph-logs/`), the new `loop.sh` falls back to legacy locations automatically. To fully migrate:
-
-```bash
-bash scaffold.sh --goal "Your goal"     # Creates new structure
-mv PROMPT_build.md .ralph/prompt-build.md
-mv .ralph-config .ralph/config.sh
-mv .ralph-logs/* .ralph/logs/
-```
-
 ## License
 
 MIT

@@ -2,9 +2,22 @@
 
 **lperez37's flavor** of the Ralph Loop. My own opinionated take on supervised autonomous development with Claude Code.
 
-This is an external bash loop that runs `claude -p` iteratively with fresh context, tracks progress, enforces quality gates and knows when to stop. It is not the canonical version. I shaped it around how I actually work: the defaults, the integrations and the workflow that make sense for my projects.
+## What is this
 
-You define a goal, optionally break it into tasks, and let Claude grind through them autonomously. Circuit breakers prevent infinite loops. Persistent learnings carry knowledge across iterations. Push notifications (via ntfy) tell you when something interesting happens so you do not have to babysit it.
+A Ralph Loop is an external bash wrapper around `claude -p` that turns Claude Code into an autonomous builder. Instead of one long interactive session where context accumulates until the model loses track, each iteration starts fresh: Claude reads the plan, the config and the learnings from disk, picks the next task, implements it, validates it, commits and pushes. Then the loop restarts with a clean context window.
+
+The problem it solves is simple. Running `claude -p` once works for small tasks. But for anything that takes more than a few iterations (a multi-file feature, a migration, a full project scaffold), a single session degrades. The context fills up, Claude starts forgetting earlier decisions, and you end up babysitting it. The Ralph Loop fixes this by externalizing state to disk. Every iteration gets the full picture without the accumulated noise.
+
+**Why this is better than building without it:**
+- **Fresh context every iteration.** No degradation over long tasks. Iteration 25 is as sharp as iteration 1.
+- **Circuit breakers.** If Claude gets stuck and produces no commits for N consecutive iterations, the loop stops instead of burning through your usage limits.
+- **Persistent learnings.** Mistakes from iteration 3 become constraints in iteration 4. Claude accumulates knowledge without accumulating context.
+- **Completion promises.** The loop does not just check off tasks. It can verify a contract like `ALL TESTS PASS AND ALL ENDPOINTS RETURN 200` before exiting.
+- **You do not have to watch it.** Push notifications via ntfy tell you when it finishes, gets stuck or hits the circuit breaker.
+
+**Working around session and usage limits.** Claude Code has session limits and weekly usage caps. The `--delay` and `--at` flags let you schedule loops to run during off-peak hours or spread work across days. Run `./loop.sh build --at 01:30` to kick off a build at 1:30 AM when your usage resets, or `--delay 3h` to space out multiple loops. This turns a weekly limit into a scheduling problem instead of a blocker.
+
+This is not the canonical Ralph Loop implementation. I shaped it around how I actually work: the defaults, the integrations (Vikunja, GitHub Issues, Playwright MCP) and the workflow that make sense for my projects.
 
 ## How it works
 

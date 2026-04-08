@@ -15,10 +15,10 @@ WARNINGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --goal)                 GOAL="$2";                 shift 2 ;;
-        --template-dir)         TEMPLATE_DIR="$2";         shift 2 ;;
-        --vikunja-task-id)      VIKUNJA_TASK_ID="$2";      shift 2 ;;
-        --completion-promise)   COMPLETION_PROMISE="$2";   shift 2 ;;
+        --goal)                 [ $# -lt 2 ] && echo "ERROR: --goal requires a value" && exit 1;               GOAL="$2";                 shift 2 ;;
+        --template-dir)         [ $# -lt 2 ] && echo "ERROR: --template-dir requires a value" && exit 1;       TEMPLATE_DIR="$2";         shift 2 ;;
+        --vikunja-task-id)      [ $# -lt 2 ] && echo "ERROR: --vikunja-task-id requires a value" && exit 1;    VIKUNJA_TASK_ID="$2";      shift 2 ;;
+        --completion-promise)   [ $# -lt 2 ] && echo "ERROR: --completion-promise requires a value" && exit 1; COMPLETION_PROMISE="$2";   shift 2 ;;
         --tdd)                  TDD="true";                shift ;;
         --playwright)           PLAYWRIGHT="true";         shift ;;
         -h|--help)
@@ -129,14 +129,14 @@ fi
 # --- Fill in Vikunja task ID if provided ---
 if [ -n "$VIKUNJA_TASK_ID" ]; then
     export VIKUNJA_TASK_ID
-    perl -pi -e 's/RALPH_VIKUNJA_TASK_ID=""/qq{RALPH_VIKUNJA_TASK_ID="$ENV{VIKUNJA_TASK_ID}"}/e' .ralph/config.sh
+    perl -pi -e 's/RALPH_VIKUNJA_TASK_ID=""/qq|RALPH_VIKUNJA_TASK_ID="$ENV{VIKUNJA_TASK_ID}"|/e' .ralph/config.sh
     echo "[+] Set Vikunja parent task ID: #$VIKUNJA_TASK_ID"
 fi
 
 # --- Fill in completion promise if provided ---
 if [ -n "$COMPLETION_PROMISE" ]; then
     export COMPLETION_PROMISE
-    perl -pi -e 's/RALPH_COMPLETION_PROMISE=""/qq{RALPH_COMPLETION_PROMISE="$ENV{COMPLETION_PROMISE}"}/e' .ralph/config.sh
+    perl -pi -e 's/RALPH_COMPLETION_PROMISE=""/qq|RALPH_COMPLETION_PROMISE="$ENV{COMPLETION_PROMISE}"|/e' .ralph/config.sh
     echo "[+] Set completion promise: $COMPLETION_PROMISE"
 fi
 

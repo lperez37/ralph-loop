@@ -68,7 +68,7 @@ per iteration, no exceptions.
 
 3b. BROWSER VERIFICATION via Playwright MCP (conditional):
     Check `RALPH_PLAYWRIGHT` in `.ralph/config.sh`. If `true`:
-    - Ensure the dev server is running (use `RALPH_DEV_CMD`/`RALPH_DEV_PORT` from config)
+    - The loop has already ensured the dev server is running. Do not start another one; use the existing server on `RALPH_DEV_PORT`. If the port does not respond, fix the configuration rather than spawning a second instance.
     - Call `mcp__playwright__browser_navigate` to open `http://localhost:RALPH_DEV_PORT`
     - Call `mcp__playwright__browser_snapshot` to get the page accessibility tree — verify
       the page renders without errors and key elements are present

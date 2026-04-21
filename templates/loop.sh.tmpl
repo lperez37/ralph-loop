@@ -240,15 +240,38 @@ ensure_dev_server() {
     [ -z "$dev_cmd" ] && return 0
     [ -z "$dev_port" ] && return 0
 
+    # Fast path: configured port responds. Nothing to do.
+    if curl -s "http://localhost:$dev_port" > /dev/null 2>&1; then
+        return 0
+    fi
+
+    # Port silent but we previously spawned a dev-server and it's still alive.
+    # Almost always means the server auto-bumped to a different port because
+    # $dev_port was taken, or $dev_port is misconfigured. Do NOT spawn another.
+    if [ -n "${DEV_PID:-}" ] && kill -0 "$DEV_PID" 2>/dev/null; then
+        echo "[Ralph] WARNING: DEV_PID $DEV_PID is alive but port $dev_port is not responding."
+        echo "[Ralph]          Does RALPH_DEV_PORT match the port your dev server actually binds?"
+        echo "[Ralph]          Not spawning a second instance. Check $LOG_DIR/dev-server.log"
+        return 0
+    fi
+
+    # Port silent, no tracked PID, but a process matching $dev_cmd exists.
+    # Likely started manually or in a previous run. Don't stack a duplicate.
+    if pgrep -f -- "$dev_cmd" > /dev/null 2>&1; then
+        echo "[Ralph] WARNING: A process matching '$dev_cmd' is already running,"
+        echo "[Ralph]          but port $dev_port is not responding. Not re-spawning."
+        echo "[Ralph]          Check RALPH_DEV_PORT or kill the stray process."
+        return 0
+    fi
+
+    # Genuinely no dev server running. Start one.
+    echo "[Ralph] Starting dev server: $dev_cmd"
+    bash -c "$dev_cmd" &>"$LOG_DIR/dev-server.log" &
+    DEV_PID=$!
+    echo "[Ralph] Dev server PID: $DEV_PID"
+    sleep 5
     if ! curl -s "http://localhost:$dev_port" > /dev/null 2>&1; then
-        echo "[Ralph] Starting dev server: $dev_cmd"
-        bash -c "$dev_cmd" &>"$LOG_DIR/dev-server.log" &
-        DEV_PID=$!
-        echo "[Ralph] Dev server PID: $DEV_PID"
-        sleep 5
-        if ! curl -s "http://localhost:$dev_port" > /dev/null 2>&1; then
-            echo "[Ralph] WARNING: Dev server may not have started. Check $LOG_DIR/dev-server.log"
-        fi
+        echo "[Ralph] WARNING: Dev server may not have started. Check $LOG_DIR/dev-server.log"
     fi
 }
 

@@ -1,3 +1,36 @@
+## CRITICAL RULE: ONE TASK PER ITERATION
+
+You must complete EXACTLY ONE task per run of this prompt, then exit. Do NOT
+bundle multiple tasks into a single iteration, even if you have context budget
+left, even if the next task is trivial, even if it would be "more efficient."
+The loop will restart you with fresh context for the next task.
+
+Exit conditions per iteration, checked in order:
+
+1. If ALL tasks in @IMPLEMENTATION_PLAN.md are complete AND the completion
+   promise (if set) is genuinely true → output `RALPH_COMPLETE` followed by
+   `<promise>EXACT PROMISE TEXT</promise>`. This is the only path that
+   terminates the whole loop.
+2. If you just completed ONE task (marked `[x]`, committed, pushed, learnings
+   appended) → output `Task <N.M> complete. Exiting iteration.` and stop.
+3. If you cannot make progress on any task → output a brief diagnosis under
+   "Known Issues" in @IMPLEMENTATION_PLAN.md and stop.
+
+Why this matters (fresh-context-per-task is load-bearing):
+- Each iteration re-reads @IMPLEMENTATION_PLAN.md and current source state.
+- Drift and context poisoning cannot accumulate across tasks.
+- `.ralph/learnings.md` is only useful if it actually gets read at step 0b of
+  a new iteration — bundling tasks defeats this.
+- The circuit breaker (3 consecutive no-commit iterations) only has meaning if
+  each iteration is a fresh attempt. Bundling hides stalls.
+- A bug introduced by task N gets discovered cleanly in iteration N+1 instead
+  of through a context that "remembers writing working code."
+
+Budget is not a goal. Trivial tasks still get their own iteration. ONE task
+per iteration, no exceptions.
+
+--- END CRITICAL RULE ---
+
 0a. Read `.ralph/config.sh` to load project configuration.
 0b. Read `.ralph/learnings.md` for codebase patterns and signs from prior iterations.
 0c. Study @IMPLEMENTATION_PLAN.md to find the next incomplete task (if it exists).

@@ -80,6 +80,44 @@ bash /tmp/ralph-loop/scripts/scaffold.sh \
 ./loop.sh build
 ```
 
+## Use as a Claude Code skill
+
+This repo ships as a Claude Code skill. Once installed, you can ask Claude Code to set up and drive the loop for you with `/ralph-loop setup "goal"` (or just "set up a ralph loop to build X").
+
+### Install
+
+Symlink the skill into your Claude Code skills directory (keeps it in sync with the repo):
+
+```bash
+git clone https://github.com/lperez37/ralph-loop.git
+ln -s "$(pwd)/ralph-loop/skill/ralph-loop" ~/.claude/skills/ralph-loop
+```
+
+Or copy it if you do not want a live link to the repo:
+
+```bash
+git clone https://github.com/lperez37/ralph-loop.git
+cp -rL ralph-loop/skill/ralph-loop ~/.claude/skills/ralph-loop
+```
+
+The `-L` flag follows the skill's internal symlinks to `templates/` and `scripts/` so the copied directory is self-contained.
+
+### Use
+
+Open any project in Claude Code and say something like:
+
+| Command | What it does |
+|---------|-------------|
+| `/ralph-loop setup "goal"` | Scaffold `.ralph/`, copy templates, configure, add to `.gitignore` |
+| `/ralph-loop plan` | Generate `IMPLEMENTATION_PLAN.md` |
+| `/ralph-loop build [N]` | Start the build loop |
+| `/ralph-loop run [plan\|build]` | Launch the loop from inside the current Claude Code session |
+| `/ralph-loop status` | Show progress |
+| `/ralph-loop resume` | Pick up where the last run left off |
+| `/ralph-loop clean` | Remove `.ralph/` (preserves `IMPLEMENTATION_PLAN.md` and learnings) |
+
+Claude handles scaffolding, template copying, config questions and running the loop. The full command reference lives in [`skill/ralph-loop/SKILL.md`](skill/ralph-loop/SKILL.md).
+
 ## Requirements
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command)

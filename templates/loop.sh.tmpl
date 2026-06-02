@@ -25,7 +25,8 @@ iso_timestamp() {
 # --- Defaults ---
 DEFAULT_BUILD_ITERATIONS="${RALPH_DEFAULT_BUILD_ITERATIONS:-25}"
 DEFAULT_PLAN_ITERATIONS="${RALPH_DEFAULT_PLAN_ITERATIONS:-5}"
-MODEL="${RALPH_MODEL:-opus}"
+ENGINE="${RALPH_ENGINE:-claude}"
+MODEL="${RALPH_MODEL:-}"
 LOG_DIR=".ralph/logs"
 STATE_DIR=".ralph/state"
 DELAY=""
@@ -51,7 +52,8 @@ COMMANDS
 OPTIONS
   --delay DURATION    Delay start (e.g., 3h, 30m, 1h30m)
   --at TIME           Start at specific time (e.g., 01:30, 23:00)
-  --model MODEL       Override model (default: opus)
+  --engine ENGINE     Override engine (claude | codex | opencode)
+  --model MODEL       Override model (default: engine-specific)
   --prompt FILE       Override prompt file
 
 EXAMPLES
@@ -83,12 +85,64 @@ while [[ $# -gt 0 ]]; do
         help|--help|-h) show_help ;;
         --delay)  [ $# -lt 2 ] && echo "ERROR: --delay requires a value" && exit 1; DELAY="$2";       shift 2 ;;
         --at)     [ $# -lt 2 ] && echo "ERROR: --at requires a value" && exit 1;    START_AT="$2";    shift 2 ;;
+        --engine) [ $# -lt 2 ] && echo "ERROR: --engine requires a value" && exit 1; ENGINE="$2";    shift 2 ;;
         --model)  [ $# -lt 2 ] && echo "ERROR: --model requires a value" && exit 1; MODEL="$2";      shift 2 ;;
         --prompt) [ $# -lt 2 ] && echo "ERROR: --prompt requires a value" && exit 1; PROMPT_FILE="$2"; shift 2 ;;
         *)        POSITIONAL+=("$1"); shift ;;
     esac
 done
 set -- "${POSITIONAL[@]:-}"
+
+# --- Resolve engine and model ---
+case "$ENGINE" in
+    claude|codex|opencode) ;;
+    *) echo "ERROR: Unknown engine '$ENGINE' (expected: claude, codex, opencode)"; exit 1 ;;
+esac
+# Empty model means "use the engine's own default"; claude has no notion of a
+# default model on the CLI, so fall back to opus there.
+[ -z "$MODEL" ] && [ "$ENGINE" = "claude" ] && MODEL="opus"
+
+# --- Engine invocation ---
+# Reads the iteration prompt on stdin and runs the configured coding agent.
+# All output (stdout+stderr) is streamed so the loop can scan it for completion
+# signals (RALPH_COMPLETE / <promise>). Returns the agent's own exit code.
+run_engine() {
+    case "$ENGINE" in
+        claude)
+            claude -p \
+                ${MODEL:+--model "$MODEL"} \
+                --dangerously-skip-permissions \
+                --verbose
+            ;;
+        codex)
+            # `codex exec -` reads the prompt from stdin and runs non-interactively.
+            if [ -n "${RALPH_CODEX_SANDBOX:-}" ]; then
+                codex exec \
+                    ${MODEL:+-m "$MODEL"} \
+                    --sandbox "$RALPH_CODEX_SANDBOX" \
+                    --skip-git-repo-check \
+                    -
+            else
+                codex exec \
+                    ${MODEL:+-m "$MODEL"} \
+                    --dangerously-bypass-approvals-and-sandbox \
+                    --skip-git-repo-check \
+                    -
+            fi
+            ;;
+        opencode)
+            # opencode run takes the prompt as a positional arg (no stdin support),
+            # so slurp stdin into a variable first. Model is provider/model format.
+            local prompt
+            prompt="$(cat)"
+            opencode run \
+                ${MODEL:+-m "$MODEL"} \
+                --agent "${RALPH_OPENCODE_AGENT:-build}" \
+                --dangerously-skip-permissions \
+                "$prompt"
+            ;;
+    esac
+}
 
 # --- Status command ---
 if [ "${1:-}" = "status" ]; then
@@ -98,6 +152,7 @@ if [ "${1:-}" = "status" ]; then
 import sys, json
 d = json.load(sys.stdin)
 print(f\"Status:     {d['status']}\")
+print(f\"Engine:     {d.get('engine', 'claude')} ({d.get('model', '')})\")
 print(f\"Iteration:  {d['iteration']}/{d['max_iterations']}\")
 print(f\"Tasks:      {d['tasks_done']}/{d['tasks_total']} done, {d['tasks_pending']} pending\")
 print(f\"Stalls:     {d['stall_count']}\")
@@ -182,6 +237,17 @@ fi
 # --- Safety checks ---
 if [ ! -f "$PROMPT_FILE" ]; then
     echo "ERROR: $PROMPT_FILE not found. Run scaffold.sh first (see README)."
+    exit 1
+fi
+
+# --- Engine binary check ---
+if ! command -v "$ENGINE" >/dev/null 2>&1; then
+    echo "ERROR: '$ENGINE' CLI not found in PATH."
+    case "$ENGINE" in
+        claude)   echo "       Install Claude Code: https://docs.anthropic.com/en/docs/claude-code" ;;
+        codex)    echo "       Install Codex CLI:   npm i -g @openai/codex  (https://developers.openai.com/codex/cli)" ;;
+        opencode) echo "       Install opencode:    https://opencode.ai/docs" ;;
+    esac
     exit 1
 fi
 
@@ -334,10 +400,11 @@ write_progress() {
     tasks_pending=$(count_tasks pending)
     tasks_total=$(count_tasks total)
 
-    local branch_safe mode_safe model_safe started_safe
+    local branch_safe mode_safe model_safe engine_safe started_safe
     branch_safe=$(json_escape "$CURRENT_BRANCH")
     mode_safe=$(json_escape "$MODE")
     model_safe=$(json_escape "$MODEL")
+    engine_safe=$(json_escape "$ENGINE")
     started_safe=$(json_escape "$STARTED_AT")
 
     cat > "$STATE_DIR/progress.json" <<PROGRESS_EOF
@@ -345,6 +412,7 @@ write_progress() {
   "iteration": $ITERATION,
   "max_iterations": $MAX_ITERATIONS,
   "mode": "$mode_safe",
+  "engine": "$engine_safe",
   "model": "$model_safe",
   "branch": "$branch_safe",
   "last_sha": "$(git rev-parse --short HEAD 2>/dev/null || echo 'none')",
@@ -386,7 +454,8 @@ STARTED_AT=$(iso_timestamp)
 echo ""
 echo "  ralph ~ $MODE"
 echo "  ─────────────────"
-echo "  model:      $MODEL"
+echo "  engine:     $ENGINE"
+echo "  model:      ${MODEL:-<engine default>}"
 echo "  iterations: $MAX_ITERATIONS"
 echo "  branch:     $CURRENT_BRANCH"
 echo "  prompt:     $PROMPT_FILE"
@@ -446,16 +515,12 @@ while true; do
 
     set +e
     { echo "Ralph iteration $ITERATION/$MAX_ITERATIONS on branch $CURRENT_BRANCH"; cat "$PROMPT_FILE"; } | \
-        claude -p \
-        --model "$MODEL" \
-        --dangerously-skip-permissions \
-        --verbose \
-        2>&1 | tee -a "$LOG_FILE"
-    CLAUDE_EXIT=${PIPESTATUS[1]:-$?}
+        run_engine 2>&1 | tee -a "$LOG_FILE"
+    ENGINE_EXIT=${PIPESTATUS[1]:-$?}
     set -e
 
-    if [ "${CLAUDE_EXIT:-0}" -ne 0 ]; then
-        echo "[Ralph] WARNING: Claude exited with code $CLAUDE_EXIT. Continuing loop..."
+    if [ "${ENGINE_EXIT:-0}" -ne 0 ]; then
+        echo "[Ralph] WARNING: $ENGINE exited with code $ENGINE_EXIT. Continuing loop..."
     fi
 
     # Push changes

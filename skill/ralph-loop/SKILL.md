@@ -13,7 +13,13 @@ argument-hint: "[setup|plan|build|run|status|resume|clean] [args...]"
 
 # Ralph Wiggum Loop
 
-Supervised autonomous development using `loop.sh` — an external bash loop that runs `claude -p` in iterations with fresh context each time.
+Supervised autonomous development using `loop.sh` — an external bash loop that runs a coding-agent CLI in iterations with fresh context each time. The engine is configurable: **`claude`** (Claude Code, default), **`codex`** (OpenAI Codex CLI), or **`opencode`**. Set it with `--engine` at setup or `RALPH_ENGINE` in `.ralph/config.sh`; all loop features behave identically across engines.
+
+| Engine | Per-iteration invocation | Model format |
+|--------|--------------------------|--------------|
+| `claude` | `claude -p` (prompt on stdin) | plain (`opus`, `sonnet`) |
+| `codex` | `codex exec -` (prompt on stdin) | e.g. `gpt-5.3-codex` |
+| `opencode` | `opencode run "<prompt>"` (prompt as arg) | `provider/model` |
 
 ## Commands
 
@@ -44,7 +50,14 @@ fi
 bash "$SKILL_DIR/scripts/scaffold.sh" --goal "THE_GOAL" --template-dir "$SKILL_DIR/templates"
 ```
 
-Optional flags: `--completion-promise "TEXT"`, `--tdd`, `--playwright`
+Optional flags: `--engine claude|codex|opencode`, `--model MODEL`, `--completion-promise "TEXT"`, `--tdd`, `--playwright`
+
+To scaffold for a non-Claude engine:
+
+```bash
+bash "$SKILL_DIR/scripts/scaffold.sh" --goal "THE_GOAL" --template-dir "$SKILL_DIR/templates" --engine codex
+bash "$SKILL_DIR/scripts/scaffold.sh" --goal "THE_GOAL" --template-dir "$SKILL_DIR/templates" --engine opencode --model anthropic/claude-sonnet-4-5
+```
 
 2. After scaffolding, customize the generated files:
 
@@ -53,7 +66,8 @@ Optional flags: `--completion-promise "TEXT"`, `--tdd`, `--playwright`
    c. **`IMPLEMENTATION_PLAN.md`** — Either fill manually or run `/ralph-loop plan` to generate.
 
 3. Ask the user these configuration questions (apply answers to `.ralph/config.sh`):
-   - Model preference? (default: opus)
+   - Engine? `claude` (default), `codex`, or `opencode`
+   - Model preference? (claude default: opus; codex/opencode: leave empty to use the CLI's own default)
    - Max build iterations? (default: 25)
    - Task source? GitHub Issues or standalone plan? (default: standalone)
    - If GitHub Issues: label? (default: ralph-loop)
@@ -331,7 +345,10 @@ All variables in `.ralph/config.sh`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RALPH_MODEL` | `opus` | Claude model to use |
+| `RALPH_ENGINE` | `claude` | Coding agent CLI: `claude`, `codex`, or `opencode` |
+| `RALPH_MODEL` | `opus` | Model for the engine. Empty = engine default (claude falls back to `opus`) |
+| `RALPH_CODEX_SANDBOX` | (none) | codex only. Sandbox policy (`read-only`/`workspace-write`/`danger-full-access`); empty = fully autonomous |
+| `RALPH_OPENCODE_AGENT` | `build` | opencode only. Agent to run (`build` edits, `plan` is read-only) |
 | `RALPH_DEFAULT_BUILD_ITERATIONS` | `25` | Default iterations for build mode |
 | `RALPH_DEFAULT_PLAN_ITERATIONS` | `5` | Default iterations for plan mode |
 | `RALPH_PROJECT_GOAL` | (none) | One-line project goal |

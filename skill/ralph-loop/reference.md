@@ -5,7 +5,7 @@
 ```
 .ralph/
 ├── config.sh                 # Bash-sourceable configuration
-├── prompt-build.md           # Build mode prompt (fed to claude -p each iteration)
+├── prompt-build.md           # Build mode prompt (fed to the engine each iteration)
 ├── prompt-plan.md            # Plan mode prompt
 ├── learnings.md              # Persistent inter-iteration memory (append-only)
 ├── logs/
@@ -22,6 +22,7 @@
   "iteration": 5,
   "max_iterations": 25,
   "mode": "build",
+  "engine": "claude",
   "model": "opus",
   "branch": "feat/my-feature",
   "last_sha": "abc1234",
@@ -87,9 +88,20 @@ The `<promise>` tag extraction uses literal string comparison. Common issues:
 - Check the log for `[Ralph] Promise mismatch` lines to see what was extracted vs expected
 
 ### Permission errors
-The loop uses `--dangerously-skip-permissions`. If Claude needs elevated permissions:
+Each engine runs fully unattended by default:
+- `claude` → `--dangerously-skip-permissions`
+- `codex` → `--dangerously-bypass-approvals-and-sandbox` (override with `RALPH_CODEX_SANDBOX`)
+- `opencode` → `--dangerously-skip-permissions` + the `build` agent (override with `RALPH_OPENCODE_AGENT`)
+
+If the engine needs elevated permissions:
 - Ensure the user running loop.sh has appropriate file/git permissions.
 - For GitHub operations, ensure `gh auth status` shows authenticated.
+
+### Wrong engine / model errors
+- `'codex' CLI not found` / `'opencode' CLI not found`: install the engine, or switch with `--engine claude`.
+- opencode model errors: opencode needs `provider/model` (e.g. `anthropic/claude-sonnet-4-5`), not a bare name.
+- codex authentication: codex uses its own auth (`codex login` or `OPENAI_API_KEY`); the loop does not manage it.
+- Leave `RALPH_MODEL=""` to let codex/opencode pick their own configured default model.
 
 ## Advanced: Parallel Execution
 
@@ -235,6 +247,7 @@ Signs that prove universally useful should be promoted to AGENTS.md Operational 
 These can be passed directly to loop.sh:
 
 ```bash
+./loop.sh build --engine codex      # Override engine (claude|codex|opencode)
 ./loop.sh build --model sonnet      # Override model
 ./loop.sh build --prompt custom.md  # Use custom prompt file
 ./loop.sh build --delay 2h          # Delayed start

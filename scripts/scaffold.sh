@@ -11,12 +11,16 @@ VIKUNJA_TASK_ID=""
 COMPLETION_PROMISE=""
 TDD="false"
 PLAYWRIGHT="false"
+ENGINE="claude"
+MODEL=""
 WARNINGS=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --goal)                 [ $# -lt 2 ] && echo "ERROR: --goal requires a value" && exit 1;               GOAL="$2";                 shift 2 ;;
         --template-dir)         [ $# -lt 2 ] && echo "ERROR: --template-dir requires a value" && exit 1;       TEMPLATE_DIR="$2";         shift 2 ;;
+        --engine)               [ $# -lt 2 ] && echo "ERROR: --engine requires a value" && exit 1;             ENGINE="$2";               shift 2 ;;
+        --model)                [ $# -lt 2 ] && echo "ERROR: --model requires a value" && exit 1;              MODEL="$2";                shift 2 ;;
         --vikunja-task-id)      [ $# -lt 2 ] && echo "ERROR: --vikunja-task-id requires a value" && exit 1;    VIKUNJA_TASK_ID="$2";      shift 2 ;;
         --completion-promise)   [ $# -lt 2 ] && echo "ERROR: --completion-promise requires a value" && exit 1; COMPLETION_PROMISE="$2";   shift 2 ;;
         --tdd)                  TDD="true";                shift ;;
@@ -27,6 +31,8 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --goal TEXT               Project goal (required)"
             echo "  --template-dir PATH       Template directory"
+            echo "  --engine ENGINE           Coding agent CLI: claude | codex | opencode (default: claude)"
+            echo "  --model MODEL             Model for the engine (default: engine-specific)"
             echo "  --vikunja-task-id ID      Vikunja parent task ID"
             echo "  --completion-promise TEXT  Completion promise"
             echo "  --tdd                     Enable TDD mode"
@@ -41,6 +47,12 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# --- Validate engine ---
+case "$ENGINE" in
+    claude|codex|opencode) ;;
+    *) echo "ERROR: Unknown --engine '$ENGINE' (expected: claude, codex, opencode)"; exit 1 ;;
+esac
 
 # Resolve template directory (default: sibling templates/ dir)
 if [ -z "$TEMPLATE_DIR" ]; then
@@ -70,11 +82,22 @@ if [ -z "$GOAL" ]; then
     echo ""
 fi
 
+# Engine binary presence check
+if ! command -v "$ENGINE" &>/dev/null; then
+    WARNINGS+=("'$ENGINE' CLI not found in PATH — install it before running ./loop.sh build")
+fi
+
+# MCP-backed integrations (Vikunja, Playwright) are wired for Claude Code. codex
+# and opencode support MCP too, but require their own server configuration.
+if [ "$ENGINE" != "claude" ] && { [ -n "$VIKUNJA_TASK_ID" ] || [ "$PLAYWRIGHT" = "true" ]; }; then
+    WARNINGS+=("Engine is '$ENGINE' but MCP-based features (Vikunja/Playwright) are configured for Claude Code — set up the equivalent MCP servers in $ENGINE's config, or expect those steps to be skipped")
+fi
+
 if [ -n "$VIKUNJA_TASK_ID" ]; then
-    if ! command -v claude &>/dev/null; then
+    if [ "$ENGINE" = "claude" ] && ! command -v claude &>/dev/null; then
         WARNINGS+=("claude CLI not found — Vikunja integration requires Claude Code with vikunja MCP server configured")
     else
-        WARNINGS+=("Vikunja task source set (#$VIKUNJA_TASK_ID) — ensure vikunja MCP server is configured in Claude settings")
+        WARNINGS+=("Vikunja task source set (#$VIKUNJA_TASK_ID) — ensure the vikunja MCP server is configured for $ENGINE")
     fi
 fi
 
@@ -124,6 +147,21 @@ if [ -n "$GOAL" ]; then
     perl -pi -e 's/\{\{PROJECT_GOAL\}\}/$ENV{GOAL}/g'    .ralph/prompt-plan.md
     perl -pi -e 's/\{\{GOAL\}\}/$ENV{GOAL}/g'            IMPLEMENTATION_PLAN.md
     echo "[+] Filled in project goal"
+fi
+
+# --- Set engine and model ---
+export ENGINE
+perl -pi -e 's/^RALPH_ENGINE=.*/qq{RALPH_ENGINE="$ENV{ENGINE}"}/e' .ralph/config.sh
+if [ -n "$MODEL" ]; then
+    export MODEL
+    perl -pi -e 's/^RALPH_MODEL=.*/qq{RALPH_MODEL="$ENV{MODEL}"}/e' .ralph/config.sh
+    echo "[+] Engine: $ENGINE, model: $MODEL"
+elif [ "$ENGINE" != "claude" ]; then
+    # codex/opencode: empty model = use the CLI's own configured default
+    perl -pi -e 's/^RALPH_MODEL=.*/RALPH_MODEL=""/' .ralph/config.sh
+    echo "[+] Engine: $ENGINE, model: (engine default)"
+else
+    echo "[+] Engine: $ENGINE, model: opus"
 fi
 
 # --- Fill in Vikunja task ID if provided ---
@@ -232,6 +270,7 @@ echo "  ─────────────────"
 echo "  done."
 echo ""
 echo "  Configuration:"
+echo "  ├── Engine:    $ENGINE${MODEL:+ ($MODEL)}"
 echo "  ├── Goal:      ${GOAL:-"(not set — edit files manually)"}"
 if [ -n "$VIKUNJA_TASK_ID" ]; then
     echo "  ├── Vikunja:   task #$VIKUNJA_TASK_ID"

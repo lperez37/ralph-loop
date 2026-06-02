@@ -4,9 +4,19 @@
 
 ## What is this
 
-A Ralph Loop is an external bash wrapper around `claude -p` that turns Claude Code into an autonomous builder. Instead of one long interactive session where context accumulates until the model loses track, each iteration starts fresh: Claude reads the plan, the config and the learnings from disk, picks the next task, implements it, validates it, commits and pushes. Then the loop restarts with a clean context window.
+A Ralph Loop is an external bash wrapper around a coding-agent CLI that turns it into an autonomous builder. Instead of one long interactive session where context accumulates until the model loses track, each iteration starts fresh: the agent reads the plan, the config and the learnings from disk, picks the next task, implements it, validates it, commits and pushes. Then the loop restarts with a clean context window.
 
-The problem it solves is simple. Running `claude -p` once works for small tasks. But for anything that takes more than a few iterations (a multi-file feature, a migration, a full project scaffold), a single session degrades. The context fills up, Claude starts forgetting earlier decisions, and you end up babysitting it. The Ralph Loop fixes this by externalizing state to disk. Every iteration gets the full picture without the accumulated noise.
+It is **engine-agnostic** — pick whichever CLI you have set up:
+
+| Engine | CLI | Non-interactive call | Model format |
+|--------|-----|----------------------|--------------|
+| `claude` (default) | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude -p` (stdin) | plain, e.g. `opus`, `sonnet` |
+| `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/cli) | `codex exec -` (stdin) | e.g. `gpt-5.3-codex` |
+| `opencode` | [opencode](https://opencode.ai/docs) | `opencode run` (arg) | `provider/model`, e.g. `anthropic/claude-sonnet-4-5` |
+
+Set the engine once with `--engine` at scaffold time (or `RALPH_ENGINE` in `.ralph/config.sh`); everything else — circuit breaker, promises, learnings, notifications — works identically across all three.
+
+The problem it solves is simple. Running an agent once works for small tasks. But for anything that takes more than a few iterations (a multi-file feature, a migration, a full project scaffold), a single session degrades. The context fills up, the model starts forgetting earlier decisions, and you end up babysitting it. The Ralph Loop fixes this by externalizing state to disk. Every iteration gets the full picture without the accumulated noise.
 
 **Why this is better than building without it:**
 - **Fresh context every iteration.** No degradation over long tasks. Iteration 25 is as sharp as iteration 1.
@@ -31,7 +41,7 @@ You define a goal
   loop.sh plan  -->  generates IMPLEMENTATION_PLAN.md
         |
         v
-  loop.sh build -->  iterates: claude -p reads prompt, picks next task,
+  loop.sh build -->  iterates: engine reads prompt, picks next task,
         |            implements, validates, commits, pushes
         |
         v   (each iteration)
@@ -48,7 +58,7 @@ You define a goal
   Exit when: all tasks done | promise fulfilled | max iterations | circuit breaker
 ```
 
-Each iteration gets **fresh context**. Claude reads the plan, config and learnings from disk. No context window accumulation across iterations.
+Each iteration gets **fresh context**. The agent reads the plan, config and learnings from disk. No context window accumulation across iterations.
 
 ## Quick start
 
@@ -120,7 +130,10 @@ Claude handles scaffolding, template copying, config questions and running the l
 
 ## Requirements
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command)
+- One of the supported engine CLIs (pick at least one):
+  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command) — the default
+  - [OpenAI Codex CLI](https://developers.openai.com/codex/cli) (`codex` command) — `npm i -g @openai/codex`
+  - [opencode](https://opencode.ai/docs) (`opencode` command)
 - `git` (the loop tracks progress via commits)
 - `bash` 4+, `perl` (for template substitution)
 - `curl` (for ntfy notifications, optional)
@@ -140,6 +153,8 @@ bash scaffold.sh --goal "Your goal here" --template-dir /path/to/templates [opti
 |--------|-------------|
 | `--goal TEXT` | Project goal (fills templates) |
 | `--template-dir PATH` | Path to the `templates/` directory |
+| `--engine ENGINE` | Coding agent CLI: `claude` (default), `codex`, or `opencode` |
+| `--model MODEL` | Model for the engine (default: engine-specific) |
 | `--vikunja-task-id ID` | Drive the loop from a Vikunja task tree |
 | `--completion-promise TEXT` | Verification contract (see [Completion promises](#completion-promises)) |
 | `--tdd` | Enable Test-Driven Development mode |
@@ -167,7 +182,8 @@ The main loop runner.
 |--------|-------------|
 | `--delay DURATION` | Delay start (e.g. `3h`, `30m`, `1h30m`) |
 | `--at TIME` | Start at specific time (e.g. `01:30`) |
-| `--model MODEL` | Override Claude model (default: `opus`) |
+| `--engine ENGINE` | Override engine (`claude` \| `codex` \| `opencode`) |
+| `--model MODEL` | Override model (default: engine-specific) |
 | `--prompt FILE` | Override prompt file |
 
 ```bash
@@ -186,7 +202,7 @@ your-project/
 ├── IMPLEMENTATION_PLAN.md        # Task plan (at root for easy reference)
 └── .ralph/                       # Hidden, gitignored
     ├── config.sh                 # Configuration (bash-sourceable)
-    ├── prompt-build.md           # Build prompt (fed to claude -p)
+    ├── prompt-build.md           # Build prompt (fed to the engine each iteration)
     ├── prompt-plan.md            # Plan prompt
     ├── learnings.md              # Persistent memory across iterations
     ├── logs/
@@ -201,7 +217,10 @@ All variables live in `.ralph/config.sh`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RALPH_MODEL` | `opus` | Claude model |
+| `RALPH_ENGINE` | `claude` | Coding agent CLI: `claude`, `codex`, or `opencode` |
+| `RALPH_MODEL` | `opus` | Model for the engine. Empty = engine's own default (claude falls back to `opus`) |
+| `RALPH_CODEX_SANDBOX` | (empty) | codex only. Sandbox policy (`read-only`/`workspace-write`/`danger-full-access`); empty = fully autonomous |
+| `RALPH_OPENCODE_AGENT` | `build` | opencode only. Agent to run (`build` edits files, `plan` is read-only) |
 | `RALPH_DEFAULT_BUILD_ITERATIONS` | `25` | Default build iterations |
 | `RALPH_DEFAULT_PLAN_ITERATIONS` | `5` | Default plan iterations |
 | `RALPH_PROJECT_GOAL` | | One-line project goal |
@@ -218,6 +237,44 @@ All variables live in `.ralph/config.sh`:
 | `RALPH_NTFY_URL` | | Full ntfy URL (overrides topic) |
 
 ## Features
+
+### Engines (claude / codex / opencode)
+
+The loop drives any of three coding-agent CLIs. Choose at scaffold time:
+
+```bash
+# Default — Claude Code
+bash scaffold.sh --goal "..." --template-dir ./templates
+
+# OpenAI Codex CLI
+bash scaffold.sh --goal "..." --template-dir ./templates --engine codex
+# optionally pin a model: --model gpt-5.3-codex
+
+# opencode (model uses provider/model format)
+bash scaffold.sh --goal "..." --template-dir ./templates \
+  --engine opencode --model anthropic/claude-sonnet-4-5
+```
+
+How each engine is invoked per iteration:
+
+| Engine | Command | Autonomy flag |
+|--------|---------|---------------|
+| `claude` | `claude -p --model M --dangerously-skip-permissions --verbose` (prompt on stdin) | `--dangerously-skip-permissions` |
+| `codex` | `codex exec -m M --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -` (prompt on stdin) | `--dangerously-bypass-approvals-and-sandbox` (or set `RALPH_CODEX_SANDBOX`) |
+| `opencode` | `opencode run -m M --agent build --dangerously-skip-permissions "<prompt>"` (prompt as arg) | `--dangerously-skip-permissions` + the `build` agent (`RALPH_OPENCODE_AGENT`) |
+
+Notes:
+- **Model leave-empty = engine default.** With `RALPH_MODEL=""`, codex and opencode use whatever model their own config/auth selects. `claude` falls back to `opus`.
+- **codex sandbox.** By default the loop runs codex fully unattended (the bypass flag), mirroring Claude's `--dangerously-skip-permissions`. Set `RALPH_CODEX_SANDBOX=workspace-write` (or `danger-full-access`) to run sandboxed instead.
+- **MCP-backed extras.** Vikunja and Playwright steps are wired for Claude Code's MCP. codex and opencode support MCP too, but you must configure the equivalent servers in their own config; otherwise those optional steps are simply skipped.
+- **`AGENTS.md`** is the shared backpressure file — all three CLIs read it natively, so the same project works across engines.
+
+You can also override the engine for a single run without re-scaffolding:
+
+```bash
+./loop.sh build --engine codex
+./loop.sh build --engine opencode --model anthropic/claude-sonnet-4-5
+```
 
 ### Circuit breaker
 

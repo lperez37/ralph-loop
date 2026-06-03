@@ -375,12 +375,16 @@ elapsed() {
 # Matches both "- [x] Title" checkboxes and "**Status:** [x]" field format
 count_tasks() {
     local status="$1"
+    local pattern count
     if [ ! -f IMPLEMENTATION_PLAN.md ]; then echo "0"; return; fi
     case "$status" in
-        done)    grep -cE '(\- \[x\]|\*\*Status:\*\* \[x\])' IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0" ;;
-        pending) grep -cE '(\- \[ \]|\*\*Status:\*\* \[ \])' IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0" ;;
-        total)   grep -cE '(\- \[.\]|\*\*Status:\*\* \[.\])' IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0" ;;
+        done)    pattern='(\- \[x\]|\*\*Status:\*\* \[x\])' ;;
+        pending) pattern='(\- \[ \]|\*\*Status:\*\* \[ \])' ;;
+        total)   pattern='(\- \[.\]|\*\*Status:\*\* \[.\])' ;;
+        *)       echo "0"; return ;;
     esac
+    count=$(grep -cE "$pattern" IMPLEMENTATION_PLAN.md 2>/dev/null) || true
+    echo "${count:-0}"
 }
 
 # --- JSON helper ---

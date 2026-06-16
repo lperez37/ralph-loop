@@ -247,7 +247,7 @@ Signs that prove universally useful should be promoted to AGENTS.md Operational 
 These can be passed directly to loop.sh:
 
 ```bash
-./loop.sh build --engine codex      # Override engine (claude|codex|opencode)
+./loop.sh build --engine codex      # Override engine (claude|codex|opencode|ccrun)
 ./loop.sh build --model sonnet      # Override model
 ./loop.sh build --prompt custom.md  # Use custom prompt file
 ./loop.sh build --delay 2h          # Delayed start

@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --goal TEXT               Project goal (required)"
             echo "  --template-dir PATH       Template directory"
-            echo "  --engine ENGINE           Coding agent CLI: claude | codex | opencode (default: claude)"
+            echo "  --engine ENGINE           Coding agent CLI: claude | codex | opencode | ccrun (default: claude)"
             echo "  --model MODEL             Model for the engine (default: engine-specific)"
             echo "  --vikunja-task-id ID      Vikunja parent task ID"
             echo "  --completion-promise TEXT  Completion promise"
@@ -50,8 +50,8 @@ done
 
 # --- Validate engine ---
 case "$ENGINE" in
-    claude|codex|opencode) ;;
-    *) echo "ERROR: Unknown --engine '$ENGINE' (expected: claude, codex, opencode)"; exit 1 ;;
+    claude|codex|opencode|ccrun) ;;
+    *) echo "ERROR: Unknown --engine '$ENGINE' (expected: claude, codex, opencode, ccrun)"; exit 1 ;;
 esac
 
 # Resolve template directory (default: sibling templates/ dir)

@@ -13,8 +13,33 @@ It is **engine-agnostic** — pick whichever CLI you have set up:
 | `claude` (default) | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude -p` (stdin) | plain, e.g. `opus`, `sonnet` |
 | `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/cli) | `codex exec -` (stdin) | e.g. `gpt-5.3-codex` |
 | `opencode` | [opencode](https://opencode.ai/docs) | `opencode run` (arg) | `provider/model`, e.g. `anthropic/claude-sonnet-4-5` |
+| `ccrun` | [ccrun](https://github.com/lperez37/ccrun) | `ccrun` (prompt on stdin) | plain, e.g. `opus`, `sonnet` |
 
-Set the engine once with `--engine` at scaffold time (or `RALPH_ENGINE` in `.ralph/config.sh`); everything else — circuit breaker, promises, learnings, notifications — works identically across all three.
+Set the engine once with `--engine` at scaffold time (or `RALPH_ENGINE` in `.ralph/config.sh`); everything else — circuit breaker, promises, learnings, notifications — works identically across all four.
+
+`ccrun` is the odd one out: it is not Anthropic's CLI but a small wrapper of mine that drives the interactive Claude Code REPL headlessly so the run stays on my Claude **subscription** instead of the metered programmatic pool. See [Subscription-pool loops with ccrun](#subscription-pool-loops-with-ccrun) below.
+
+### Subscription-pool loops with ccrun
+
+[`ccrun`](https://github.com/lperez37/ccrun) is a separate small CLI (not part of this repo) that I use as the `ccrun` engine. **It is an optional dependency** — you only need it if you scaffold with `--engine ccrun`.
+
+**Why it exists.** As of Anthropic's 2026-06-15 billing split, `claude -p` and the Agent SDK draw from a capped, metered *programmatic* pool billed at API rates. The **interactive** REPL keeps running on your normal Claude subscription. ccrun drives that interactive REPL headlessly — it spawns `claude` inside a detached tmux session, feeds it one turn, and prints the final assistant message on stdout (the same stdin-in / stdout-out contract as `claude -p`). So a Ralph loop run via `--engine ccrun` stays on the subscription pool instead of burning metered programmatic credit.
+
+**Install.** Requires Node ≥ 22, tmux, the `claude` CLI on PATH, and an interactive subscription login.
+
+```bash
+git clone https://github.com/lperez37/ccrun && cd ccrun && bash scripts/install.sh
+# or run straight from GitHub:
+npx github:lperez37/ccrun
+```
+
+**Use.** Scaffold with `--engine ccrun` (or set `RALPH_ENGINE="ccrun"` in `.ralph/config.sh`). The model is a plain name like `sonnet` or `opus`. Tune the per-iteration hard cap with `RALPH_CCRUN_TIMEOUT` (seconds; ccrun kills the tmux session and returns exit 124 if a turn runs over).
+
+```bash
+bash scaffold.sh --goal "..." --template-dir ./templates --engine ccrun --model sonnet
+```
+
+**The trade-off — be honest about it.** Per iteration you only get the final assistant message in the log; there is no `--output-format stream-json` equivalent, so the per-iteration audit trail is thinner than `claude -p`. Lean on git commits and the completion promise for verification instead of the log. It has been validated driving real Ralph loops end-to-end.
 
 The problem it solves is simple. Running an agent once works for small tasks. But for anything that takes more than a few iterations (a multi-file feature, a migration, a full project scaffold), a single session degrades. The context fills up, the model starts forgetting earlier decisions, and you end up babysitting it. The Ralph Loop fixes this by externalizing state to disk. Every iteration gets the full picture without the accumulated noise.
 
@@ -134,6 +159,7 @@ Claude handles scaffolding, template copying, config questions and running the l
   - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command) — the default
   - [OpenAI Codex CLI](https://developers.openai.com/codex/cli) (`codex` command) — `npm i -g @openai/codex`
   - [opencode](https://opencode.ai/docs) (`opencode` command)
+  - [ccrun](https://github.com/lperez37/ccrun) (`ccrun` command) — optional, only for `--engine ccrun`; runs the loop on your Claude subscription instead of the metered programmatic pool (needs Node ≥ 22, tmux, and the `claude` CLI). See [Subscription-pool loops with ccrun](#subscription-pool-loops-with-ccrun)
 - `git` (the loop tracks progress via commits)
 - `bash` 4+, `perl` (for template substitution)
 - `curl` (for ntfy notifications, optional)
@@ -153,7 +179,7 @@ bash scaffold.sh --goal "Your goal here" --template-dir /path/to/templates [opti
 |--------|-------------|
 | `--goal TEXT` | Project goal (fills templates) |
 | `--template-dir PATH` | Path to the `templates/` directory |
-| `--engine ENGINE` | Coding agent CLI: `claude` (default), `codex`, or `opencode` |
+| `--engine ENGINE` | Coding agent CLI: `claude` (default), `codex`, `opencode`, or `ccrun` |
 | `--model MODEL` | Model for the engine (default: engine-specific) |
 | `--vikunja-task-id ID` | Drive the loop from a Vikunja task tree |
 | `--completion-promise TEXT` | Verification contract (see [Completion promises](#completion-promises)) |
@@ -182,7 +208,7 @@ The main loop runner.
 |--------|-------------|
 | `--delay DURATION` | Delay start (e.g. `3h`, `30m`, `1h30m`) |
 | `--at TIME` | Start at specific time (e.g. `01:30`) |
-| `--engine ENGINE` | Override engine (`claude` \| `codex` \| `opencode`) |
+| `--engine ENGINE` | Override engine (`claude` \| `codex` \| `opencode` \| `ccrun`) |
 | `--model MODEL` | Override model (default: engine-specific) |
 | `--prompt FILE` | Override prompt file |
 
@@ -217,10 +243,11 @@ All variables live in `.ralph/config.sh`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RALPH_ENGINE` | `claude` | Coding agent CLI: `claude`, `codex`, or `opencode` |
+| `RALPH_ENGINE` | `claude` | Coding agent CLI: `claude`, `codex`, `opencode`, or `ccrun` |
 | `RALPH_MODEL` | `opus` | Model for the engine. Empty = engine's own default (claude falls back to `opus`) |
 | `RALPH_CODEX_SANDBOX` | (empty) | codex only. Sandbox policy (`read-only`/`workspace-write`/`danger-full-access`); empty = fully autonomous |
 | `RALPH_OPENCODE_AGENT` | `build` | opencode only. Agent to run (`build` edits files, `plan` is read-only) |
+| `RALPH_CCRUN_TIMEOUT` | `1500` | ccrun only. Per-iteration hard timeout (seconds); exit 124 if a turn runs over |
 | `RALPH_DEFAULT_BUILD_ITERATIONS` | `25` | Default build iterations |
 | `RALPH_DEFAULT_PLAN_ITERATIONS` | `5` | Default plan iterations |
 | `RALPH_PROJECT_GOAL` | | One-line project goal |
@@ -238,9 +265,9 @@ All variables live in `.ralph/config.sh`:
 
 ## Features
 
-### Engines (claude / codex / opencode)
+### Engines (claude / codex / opencode / ccrun)
 
-The loop drives any of three coding-agent CLIs. Choose at scaffold time:
+The loop drives any of four coding-agent CLIs. Choose at scaffold time:
 
 ```bash
 # Default — Claude Code
@@ -262,6 +289,7 @@ How each engine is invoked per iteration:
 | `claude` | `claude -p --model M --dangerously-skip-permissions --verbose` (prompt on stdin) | `--dangerously-skip-permissions` |
 | `codex` | `codex exec -m M --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -` (prompt on stdin) | `--dangerously-bypass-approvals-and-sandbox` (or set `RALPH_CODEX_SANDBOX`) |
 | `opencode` | `opencode run -m M --agent build --dangerously-skip-permissions "<prompt>"` (prompt as arg) | `--dangerously-skip-permissions` + the `build` agent (`RALPH_OPENCODE_AGENT`) |
+| `ccrun` | `ccrun --model M --cwd "$PWD" --timeout T` (prompt on stdin) | runs the interactive REPL headlessly in tmux; per-turn cap via `RALPH_CCRUN_TIMEOUT` |
 
 Notes:
 - **Model leave-empty = engine default.** With `RALPH_MODEL=""`, codex and opencode use whatever model their own config/auth selects. `claude` falls back to `opus`.

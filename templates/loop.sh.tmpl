@@ -52,7 +52,7 @@ COMMANDS
 OPTIONS
   --delay DURATION    Delay start (e.g., 3h, 30m, 1h30m)
   --at TIME           Start at specific time (e.g., 01:30, 23:00)
-  --engine ENGINE     Override engine (claude | codex | opencode)
+  --engine ENGINE     Override engine (claude | codex | opencode | ccrun)
   --model MODEL       Override model (default: engine-specific)
   --prompt FILE       Override prompt file
 
@@ -95,8 +95,8 @@ set -- "${POSITIONAL[@]:-}"
 
 # --- Resolve engine and model ---
 case "$ENGINE" in
-    claude|codex|opencode) ;;
-    *) echo "ERROR: Unknown engine '$ENGINE' (expected: claude, codex, opencode)"; exit 1 ;;
+    claude|codex|opencode|ccrun) ;;
+    *) echo "ERROR: Unknown engine '$ENGINE' (expected: claude, codex, opencode, ccrun)"; exit 1 ;;
 esac
 # Empty model means "use the engine's own default"; claude has no notion of a
 # default model on the CLI, so fall back to opus there.
@@ -140,6 +140,14 @@ run_engine() {
                 --agent "${RALPH_OPENCODE_AGENT:-build}" \
                 --dangerously-skip-permissions \
                 "$prompt"
+            ;;
+        ccrun)
+            # ccrun drives the interactive `claude` REPL inside a detached tmux session
+            # (never `claude -p`), so usage stays on your Claude subscription instead of
+            # the metered programmatic/API pool. Reads the prompt on stdin and prints the
+            # final assistant message on stdout — same contract as `claude -p`.
+            # Requires the ccrun CLI on PATH: https://github.com/lperez37/ccrun
+            ccrun ${MODEL:+--model "$MODEL"} --cwd "$PWD" --timeout "${RALPH_CCRUN_TIMEOUT:-1500}"
             ;;
     esac
 }
@@ -247,6 +255,7 @@ if ! command -v "$ENGINE" >/dev/null 2>&1; then
         claude)   echo "       Install Claude Code: https://docs.anthropic.com/en/docs/claude-code" ;;
         codex)    echo "       Install Codex CLI:   npm i -g @openai/codex  (https://developers.openai.com/codex/cli)" ;;
         opencode) echo "       Install opencode:    https://opencode.ai/docs" ;;
+        ccrun) echo "       Install ccrun:       https://github.com/lperez37/ccrun" ;;
     esac
     exit 1
 fi

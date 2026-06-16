@@ -5,6 +5,9 @@
 # claude   = Claude Code      (model: plain name, e.g. opus, sonnet)
 # codex    = OpenAI Codex CLI (model: e.g. gpt-5.3-codex; empty = codex default)
 # opencode = opencode         (model: provider/model, e.g. anthropic/claude-sonnet-4-5)
+# ccrun    = ccrun (drives the Claude Code REPL in tmux — subscription pool, not the
+#            metered API pool; model: plain name, e.g. sonnet, opus). Needs the ccrun
+#            CLI: https://github.com/lperez37/ccrun
 RALPH_ENGINE="claude"
 
 # Model for the engine above. Empty = use the engine's own configured default.
@@ -34,3 +37,8 @@ RALPH_CODEX_SANDBOX=""
 # --- opencode-specific ---
 # Which opencode agent to run: build (can edit files) or plan (read-only).
 RALPH_OPENCODE_AGENT="build"
+
+# --- ccrun-specific ---
+# Per-iteration hard timeout (seconds) for the ccrun engine. ccrun kills the tmux
+# session and returns exit 124 if a single turn exceeds this.
+RALPH_CCRUN_TIMEOUT=1500

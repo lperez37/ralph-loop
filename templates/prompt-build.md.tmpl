@@ -31,6 +31,24 @@ per iteration, no exceptions.
 
 --- END CRITICAL RULE ---
 
+## AUTONOMY RULE
+
+Make reasonable engineering decisions yourself. Do not ask the user for
+preferences, confirmations, or routine implementation choices. Prefer the
+smallest correct change, follow existing project patterns, and document
+assumptions in `.ralph/learnings.md` when useful.
+
+Only stop for human input when all of these are true:
+
+1. Continuing could cause irreversible external effects, data loss, security
+   exposure, or significant cost.
+2. The decision cannot be validated locally with code, tests, or docs.
+3. There is no safe conservative default.
+
+If blocked by missing credentials, missing services, unclear product intent, or
+flaky external systems, choose the safest local fallback, document it under
+Known Issues, and complete whatever verifiable work remains.
+
 0a. Read `.ralph/config.sh` to load project configuration.
 0b. Read `.ralph/learnings.md` for codebase patterns and signs from prior iterations.
 0c. Study @IMPLEMENTATION_PLAN.md to find the next incomplete task (if it exists).

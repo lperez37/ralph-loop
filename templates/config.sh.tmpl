@@ -23,6 +23,10 @@ RALPH_COMPLETION_PROMISE=""
 RALPH_TDD="false"
 RALPH_PLAYWRIGHT="false"
 RALPH_MAX_STALL=3
+# Pause between iterations in seconds (0 = no pause). Useful for long-running
+# loops to throttle token / subscription usage. Override per-run with
+# --iteration-delay SECONDS.
+RALPH_ITERATION_DELAY=0
 RALPH_DEV_CMD=""
 RALPH_DEV_PORT=""
 RALPH_NTFY_TOPIC="ralph-loop"

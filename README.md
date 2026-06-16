@@ -208,16 +208,18 @@ The main loop runner.
 |--------|-------------|
 | `--delay DURATION` | Delay start (e.g. `3h`, `30m`, `1h30m`) |
 | `--at TIME` | Start at specific time (e.g. `01:30`) |
+| `--iteration-delay SECONDS` | Pause N seconds between iterations (default: `0`) |
 | `--engine ENGINE` | Override engine (`claude` \| `codex` \| `opencode` \| `ccrun`) |
 | `--model MODEL` | Override model (default: engine-specific) |
 | `--prompt FILE` | Override prompt file |
 
 ```bash
-./loop.sh build 50                # 50 iterations
-./loop.sh build --delay 3h        # Start in 3 hours
-./loop.sh build --at 01:30        # Start at 1:30 AM
-./loop.sh plan                    # Generate implementation plan
-./loop.sh status                  # Check progress
+./loop.sh build 50                    # 50 iterations
+./loop.sh build --delay 3h            # Start in 3 hours
+./loop.sh build --at 01:30            # Start at 1:30 AM
+./loop.sh build --iteration-delay 300 # Pause 5 min between iterations
+./loop.sh plan                        # Generate implementation plan
+./loop.sh status                      # Check progress
 ```
 
 ## Project structure after setup
@@ -255,6 +257,7 @@ All variables live in `.ralph/config.sh`:
 | `RALPH_TDD` | `false` | Enable Red-Green-Refactor per task |
 | `RALPH_PLAYWRIGHT` | `false` | Enable Playwright MCP browser verification |
 | `RALPH_MAX_STALL` | `3` | Circuit breaker: consecutive no-change iterations |
+| `RALPH_ITERATION_DELAY` | `0` | Seconds to sleep between iterations. `0` disables. Override per-run with `--iteration-delay` |
 | `RALPH_VIKUNJA_TASK_ID` | | Vikunja parent task ID |
 | `RALPH_GH_ISSUES` | `false` | Enable GitHub Issues as task source |
 | `RALPH_GH_LABEL` | `ralph-loop` | GitHub label for issue-sourced tasks |
@@ -387,6 +390,16 @@ bash scaffold.sh \
 ./loop.sh build --delay 3h        # Start in 3 hours
 ./loop.sh build --at 01:30        # Start at 01:30 (tomorrow if past)
 ```
+
+### Per-iteration delay
+
+Pause between iterations to throttle long-running loops — useful when running for many hours and you want to spread Claude subscription token usage rather than burning through it in a burst.
+
+```bash
+./loop.sh build --iteration-delay 300   # Sleep 5 min between iterations
+```
+
+Or set `RALPH_ITERATION_DELAY` in `.ralph/config.sh` to make it the default for the project. `0` (default) disables the pause. The delay is skipped after the final iteration and after any completion/circuit-breaker exit, so it never adds idle time at the end of a run.
 
 ### Dev server management
 

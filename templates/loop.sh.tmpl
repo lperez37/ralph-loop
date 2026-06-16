@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Ralph Wiggum Loop — Supervised autonomous development
-# Usage: ./loop.sh [plan|build] [max_iterations] [--delay DURATION] [--at TIME]
+# Usage: ./loop.sh [plan|build] [max_iterations] [--delay DURATION] [--at TIME] [--iteration-delay SECONDS]
 # Examples:
-#   ./loop.sh                    # Build mode, default iterations
-#   ./loop.sh plan               # Plan mode
-#   ./loop.sh build 50           # Build mode, 50 iterations
-#   ./loop.sh build --delay 3h   # Build mode, start in 3 hours
-#   ./loop.sh build --at 01:30   # Build mode, start at 01:30
+#   ./loop.sh                              # Build mode, default iterations
+#   ./loop.sh plan                         # Plan mode
+#   ./loop.sh build 50                     # Build mode, 50 iterations
+#   ./loop.sh build --delay 3h             # Build mode, start in 3 hours
+#   ./loop.sh build --at 01:30             # Build mode, start at 01:30
+#   ./loop.sh build --iteration-delay 300  # Sleep 5 minutes between iterations
 
 set -euo pipefail
 
@@ -32,6 +33,7 @@ STATE_DIR=".ralph/state"
 DELAY=""
 START_AT=""
 PROMPT_FILE=""
+ITERATION_DELAY="${RALPH_ITERATION_DELAY:-0}"
 
 # --- Help ---
 show_help() {
@@ -50,20 +52,22 @@ COMMANDS
   help, --help, -h    Show this help
 
 OPTIONS
-  --delay DURATION    Delay start (e.g., 3h, 30m, 1h30m)
-  --at TIME           Start at specific time (e.g., 01:30, 23:00)
-  --engine ENGINE     Override engine (claude | codex | opencode | ccrun)
-  --model MODEL       Override model (default: engine-specific)
-  --prompt FILE       Override prompt file
+  --delay DURATION           Delay start (e.g., 3h, 30m, 1h30m)
+  --at TIME                  Start at specific time (e.g., 01:30, 23:00)
+  --iteration-delay SECONDS  Pause N seconds between iterations (default: 0)
+  --engine ENGINE            Override engine (claude | codex | opencode | ccrun)
+  --model MODEL              Override model (default: engine-specific)
+  --prompt FILE              Override prompt file
 
 EXAMPLES
-  ./loop.sh                       Build mode, default iterations
-  ./loop.sh plan                  Generate implementation plan
-  ./loop.sh build 50              Build with 50 iterations
-  ./loop.sh build --delay 3h      Start building in 3 hours
-  ./loop.sh build --at 01:30      Start building at 01:30
-  ./loop.sh status                Check loop progress
-  ./loop.sh clean                 Remove .ralph/ artifacts
+  ./loop.sh                              Build mode, default iterations
+  ./loop.sh plan                         Generate implementation plan
+  ./loop.sh build 50                     Build with 50 iterations
+  ./loop.sh build --delay 3h             Start building in 3 hours
+  ./loop.sh build --at 01:30             Start building at 01:30
+  ./loop.sh build --iteration-delay 300  Sleep 5 min between iterations
+  ./loop.sh status                       Check loop progress
+  ./loop.sh clean                        Remove .ralph/ artifacts
 
 LIFECYCLE (via Claude Code skill)
   /ralph-loop setup "goal"        Scaffold project for Ralph loop
@@ -86,6 +90,13 @@ while [[ $# -gt 0 ]]; do
         --delay)  [ $# -lt 2 ] && echo "ERROR: --delay requires a value" && exit 1; DELAY="$2";       shift 2 ;;
         --at)     [ $# -lt 2 ] && echo "ERROR: --at requires a value" && exit 1;    START_AT="$2";    shift 2 ;;
         --engine) [ $# -lt 2 ] && echo "ERROR: --engine requires a value" && exit 1; ENGINE="$2";    shift 2 ;;
+        --iteration-delay)
+                  [ $# -lt 2 ] && echo "ERROR: --iteration-delay requires a value (seconds)" && exit 1
+                  if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                      echo "ERROR: --iteration-delay must be a non-negative integer (seconds), got: $2"
+                      exit 1
+                  fi
+                  ITERATION_DELAY="$2"; shift 2 ;;
         --model)  [ $# -lt 2 ] && echo "ERROR: --model requires a value" && exit 1; MODEL="$2";      shift 2 ;;
         --prompt) [ $# -lt 2 ] && echo "ERROR: --prompt requires a value" && exit 1; PROMPT_FILE="$2"; shift 2 ;;
         *)        POSITIONAL+=("$1"); shift ;;
@@ -478,6 +489,7 @@ PROMISE_CFG="${RALPH_COMPLETION_PROMISE:-}"
 [ -n "$PROMISE_CFG" ] && echo "  promise:    $PROMISE_CFG"
 [ "${RALPH_TDD:-false}" = "true" ] && echo "  tdd:        on"
 [ -n "${RALPH_VIKUNJA_TASK_ID:-}" ] && echo "  vikunja:    #$RALPH_VIKUNJA_TASK_ID"
+[ "${ITERATION_DELAY:-0}" -gt 0 ] && echo "  iter delay: ${ITERATION_DELAY}s between iterations"
 echo ""
 
 START_EPOCH=$(date +%s)
@@ -585,6 +597,14 @@ while true; do
     fi
 
     echo "[Ralph] Iteration $ITERATION complete. Restarting with fresh context..."
+
+    # Optional pause between iterations (skip if next iteration would exit anyway)
+    if [ "${ITERATION_DELAY:-0}" -gt 0 ]; then
+        if [ $MAX_ITERATIONS -le 0 ] || [ $ITERATION -lt $MAX_ITERATIONS ]; then
+            echo "[Ralph]   zzZ  Sleeping ${ITERATION_DELAY}s before next iteration (Ctrl+C to cancel)"
+            sleep "$ITERATION_DELAY"
+        fi
+    fi
 done
 
 # --- Write final progress ---

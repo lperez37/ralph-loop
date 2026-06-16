@@ -30,7 +30,7 @@ Supervised autonomous development using `loop.sh` — an external bash loop that
 |---------|-------------|
 | `/ralph-loop setup "goal"` | Scaffold `.ralph/`, copy templates, configure, add to `.gitignore` |
 | `/ralph-loop plan` | Generate or regenerate IMPLEMENTATION_PLAN.md (via loop or interactively) |
-| `/ralph-loop build [N] [--delay T] [--at HH:MM]` | Start building from IMPLEMENTATION_PLAN.md |
+| `/ralph-loop build [N] [--delay T] [--at HH:MM] [--iteration-delay S]` | Start building from IMPLEMENTATION_PLAN.md |
 | `/ralph-loop run [plan\|build] [N]` | In-session: launch loop.sh in background, follow output |
 | `/ralph-loop status` | Show progress: tasks done/remaining, stalls, elapsed time |
 | `/ralph-loop resume` | Pick up where the last loop left off |
@@ -95,12 +95,14 @@ Walk through setup questions interactively, then run the scaffold. Same as `setu
 
 ## Build
 
-### `/ralph-loop build [N] [--delay T] [--at HH:MM]`
+### `/ralph-loop build [N] [--delay T] [--at HH:MM] [--iteration-delay S]`
 
 Tell the user to run:
 ```bash
-./loop.sh build [N] [--delay DURATION] [--at TIME]
+./loop.sh build [N] [--delay DURATION] [--at TIME] [--iteration-delay SECONDS]
 ```
+
+Use `--iteration-delay` (or set `RALPH_ITERATION_DELAY` in `.ralph/config.sh`) to throttle long-running loops — pause N seconds between iterations so subscription token usage spreads out rather than burning in a burst. Default `0` = no pause.
 
 If they want to run it from the current session, use `/ralph-loop run build` instead.
 
@@ -362,6 +364,7 @@ All variables in `.ralph/config.sh`:
 | `RALPH_TDD` | `false` | Enable TDD mode (Red-Green-Refactor per task) |
 | `RALPH_PLAYWRIGHT` | `false` | Enable Playwright MCP browser verification after each task |
 | `RALPH_MAX_STALL` | `3` | Circuit breaker threshold (consecutive no-change iterations) |
+| `RALPH_ITERATION_DELAY` | `0` | Seconds to sleep between iterations. `0` disables (default). Override per-run with `--iteration-delay` |
 | `RALPH_DEV_CMD` | (none) | Dev server start command (e.g., `npm run dev`) |
 | `RALPH_DEV_PORT` | (none) | Dev server port to health-check |
 | `RALPH_NTFY_TOPIC` | `ralph-loop` | ntfy notification topic |
@@ -374,6 +377,12 @@ All variables in `.ralph/config.sh`:
 ./loop.sh build --delay 3h        # Sleep for 3 hours, then start
 ./loop.sh build --at 01:30        # Sleep until 01:30, then start
 ```
+
+### Per-iteration delay
+```bash
+./loop.sh build --iteration-delay 300   # Sleep 5 min between iterations
+```
+Throttles long-running loops to spread subscription token usage. Set `RALPH_ITERATION_DELAY` in `.ralph/config.sh` to make it the project default. The pause is skipped after the final iteration and after any completion/circuit-breaker exit, so it never adds idle time at the end of a run.
 
 ### Circuit breaker
 Stops automatically after `RALPH_MAX_STALL` consecutive iterations with no git changes (default: 3).

@@ -252,4 +252,5 @@ These can be passed directly to loop.sh:
 ./loop.sh build --prompt custom.md  # Use custom prompt file
 ./loop.sh build --delay 2h          # Delayed start
 ./loop.sh build --at 03:00          # Start at specific time
+./loop.sh build --iteration-delay 300  # Pause 5 min between iterations
 ```

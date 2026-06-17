@@ -163,6 +163,32 @@ run_engine() {
     esac
 }
 
+RALPH_LIMIT_BACKOFF_INITIAL_SECONDS="${RALPH_LIMIT_BACKOFF_INITIAL_SECONDS:-300}"
+RALPH_LIMIT_BACKOFF_MAX_SECONDS="${RALPH_LIMIT_BACKOFF_MAX_SECONDS:-5400}"
+LIMIT_BACKOFF_SECONDS="$RALPH_LIMIT_BACKOFF_INITIAL_SECONDS"
+
+is_limit_failure() {
+    local offset="$1"
+    tail -c +"$((offset + 1))" "$LOG_FILE" 2>/dev/null | grep -Eiq \
+        "ccrun: run failed: limit|You've hit your session limit|You've reached your .* limit|usage limit|rate limit|/rate-limit-options"
+}
+
+sleep_after_limit() {
+    local base_seconds="$LIMIT_BACKOFF_SECONDS"
+    if [ "$base_seconds" -gt "$RALPH_LIMIT_BACKOFF_MAX_SECONDS" ]; then
+        base_seconds="$RALPH_LIMIT_BACKOFF_MAX_SECONDS"
+    fi
+    local jitter_percent=$((75 + RANDOM % 51))
+    local wait_seconds=$((base_seconds * jitter_percent / 100))
+    echo "[Ralph] Claude session/rate limit detected. Sleeping ${wait_seconds}s before retry (${jitter_percent}% of capped base ${base_seconds}s; max tier ${RALPH_LIMIT_BACKOFF_MAX_SECONDS}s is jittered too)."
+    notify "Ralph waiting on Claude limit" "Sleeping ${wait_seconds}s before retry on $CURRENT_BRANCH (${jitter_percent}% of ${base_seconds}s)" "hourglass"
+    sleep "$wait_seconds"
+    LIMIT_BACKOFF_SECONDS=$((base_seconds * 2))
+    if [ "$LIMIT_BACKOFF_SECONDS" -gt "$RALPH_LIMIT_BACKOFF_MAX_SECONDS" ]; then
+        LIMIT_BACKOFF_SECONDS="$RALPH_LIMIT_BACKOFF_MAX_SECONDS"
+    fi
+}
+
 # --- Status command ---
 if [ "${1:-}" = "status" ]; then
     if [ -f "$STATE_DIR/progress.json" ]; then
@@ -546,7 +572,15 @@ while true; do
 
     if [ "${ENGINE_EXIT:-0}" -ne 0 ]; then
         echo "[Ralph] WARNING: $ENGINE exited with code $ENGINE_EXIT. Continuing loop..."
+        if is_limit_failure "$LOG_OFFSET"; then
+            ITERATION=$((ITERATION - 1))
+            write_progress
+            sleep_after_limit
+            continue
+        fi
     fi
+
+    LIMIT_BACKOFF_SECONDS="$RALPH_LIMIT_BACKOFF_INITIAL_SECONDS"
 
     # Push changes
     git push origin "$CURRENT_BRANCH" 2>/dev/null || \

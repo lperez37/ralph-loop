@@ -1,5 +1,7 @@
 # Ralph Loop
 
+> **Default for long-running loops:** use `./loop.sh supervise build [N]`, not plain `./loop.sh build [N]`. `supervise build` wraps the normal fresh-context loop with a lightweight restart supervisor: it restarts if the child loop exits while monitorable work remains, backs off via the loop's Claude-limit handling, writes `.ralph/state/supervisor.json`, and stops automatically once the task plan or completion promise is done. Use plain `build` only for short foreground runs you are actively watching.
+
 **lperez37's flavor** of the Ralph Loop. My own opinionated take on supervised autonomous development with Claude Code.
 
 ## What is this
@@ -100,8 +102,8 @@ bash /tmp/ralph-loop/scripts/scaffold.sh \
 # Generate a plan
 ./loop.sh plan
 
-# Review the plan, then build
-./loop.sh build
+# Review the plan, then build under supervision for long runs
+./loop.sh supervise build 50
 ```
 
 Or the simplest version, a promise-only loop with no plan:
@@ -112,7 +114,7 @@ bash /tmp/ralph-loop/scripts/scaffold.sh \
   --template-dir /tmp/ralph-loop/templates \
   --completion-promise "ALL AUTH TESTS PASS ON 3 CONSECUTIVE RUNS"
 
-./loop.sh build
+./loop.sh supervise build 25
 ```
 
 ## Use as a Claude Code skill
@@ -146,6 +148,7 @@ Open any project in Claude Code and say something like:
 | `/ralph-loop setup "goal"` | Scaffold `.ralph/`, copy templates, configure, add to `.gitignore` |
 | `/ralph-loop plan` | Generate `IMPLEMENTATION_PLAN.md` |
 | `/ralph-loop build [N]` | Start the build loop |
+| `./loop.sh supervise build [N]` | Recommended launcher for long unattended loops |
 | `/ralph-loop run [plan\|build]` | Launch the loop from inside the current Claude Code session |
 | `/ralph-loop status` | Show progress |
 | `/ralph-loop resume` | Pick up where the last run left off |
@@ -199,6 +202,7 @@ The main loop runner.
 | Command | Description |
 |---------|-------------|
 | `build [N]` | Build mode (default). N = max iterations, default 25 |
+| `supervise build [N]` | Recommended for long unattended build loops; restarts while monitorable work remains |
 | `plan [N]` | Plan mode. N = max iterations, default 5 |
 | `status` | Show progress from `.ralph/state/progress.json` |
 | `clean` | Remove `.ralph/` (preserves IMPLEMENTATION_PLAN.md and learnings) |
@@ -214,7 +218,8 @@ The main loop runner.
 | `--prompt FILE` | Override prompt file |
 
 ```bash
-./loop.sh build 50                    # 50 iterations
+./loop.sh supervise build 50          # Recommended for long unattended loops
+./loop.sh build 50                    # Plain foreground build, 50 iterations
 ./loop.sh build --delay 3h            # Start in 3 hours
 ./loop.sh build --at 01:30            # Start at 1:30 AM
 ./loop.sh build --iteration-delay 300 # Pause 5 min between iterations

@@ -13,6 +13,8 @@ argument-hint: "[setup|plan|build|run|status|resume|clean] [args...]"
 
 # Ralph Wiggum Loop
 
+> **Default for long-running loops:** use `./loop.sh supervise build [N]`, not plain `./loop.sh build [N]`. `supervise build` wraps the normal fresh-context loop with a lightweight restart supervisor: it restarts if the child loop exits while monitorable work remains, writes `.ralph/state/supervisor.json`, and stops automatically once the task plan or completion promise is done. Use plain `build` only for short foreground runs you are actively watching.
+
 Supervised autonomous development using `loop.sh` — an external bash loop that runs a coding-agent CLI in iterations with fresh context each time. The engine is configurable: **`claude`** (Claude Code, default), **`codex`** (OpenAI Codex CLI), **`opencode`**, or **`ccrun`**. Set it with `--engine` at setup or `RALPH_ENGINE` in `.ralph/config.sh`; all loop features behave identically across engines.
 
 | Engine | Per-iteration invocation | Model format |
@@ -31,6 +33,7 @@ Supervised autonomous development using `loop.sh` — an external bash loop that
 | `/ralph-loop setup "goal"` | Scaffold `.ralph/`, copy templates, configure, add to `.gitignore` |
 | `/ralph-loop plan` | Generate or regenerate IMPLEMENTATION_PLAN.md (via loop or interactively) |
 | `/ralph-loop build [N] [--delay T] [--at HH:MM] [--iteration-delay S]` | Start building from IMPLEMENTATION_PLAN.md |
+| `./loop.sh supervise build [N]` | Recommended launcher for long unattended loops; restarts child runs until monitorable work is complete |
 | `/ralph-loop run [plan\|build] [N]` | In-session: launch loop.sh in background, follow output |
 | `/ralph-loop status` | Show progress: tasks done/remaining, stalls, elapsed time |
 | `/ralph-loop resume` | Pick up where the last loop left off |

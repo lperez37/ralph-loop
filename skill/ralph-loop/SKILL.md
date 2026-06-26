@@ -367,6 +367,8 @@ All variables in `.ralph/config.sh`:
 | `RALPH_TDD` | `false` | Enable TDD mode (Red-Green-Refactor per task) |
 | `RALPH_PLAYWRIGHT` | `false` | Enable Playwright MCP browser verification after each task |
 | `RALPH_MAX_STALL` | `3` | Circuit breaker threshold (consecutive no-change iterations) |
+| `RALPH_LIMIT_BACKOFF_INITIAL_SECONDS` | `300` | Initial retry delay after a Claude session/rate-limit failure. Applies to `claude -p` and `ccrun` when their failed output matches a limit message. |
+| `RALPH_LIMIT_BACKOFF_MAX_SECONDS` | `5400` | Maximum capped retry delay for Claude limit backoff. Each retry doubles the base delay and adds 75-125% jitter. |
 | `RALPH_ITERATION_DELAY` | `0` | Seconds to sleep between iterations. `0` disables (default). Override per-run with `--iteration-delay` |
 | `RALPH_DEV_CMD` | (none) | Dev server start command (e.g., `npm run dev`) |
 | `RALPH_DEV_PORT` | (none) | Dev server port to health-check |
@@ -386,6 +388,10 @@ All variables in `.ralph/config.sh`:
 ./loop.sh build --iteration-delay 300   # Sleep 5 min between iterations
 ```
 Throttles long-running loops to spread subscription token usage. Set `RALPH_ITERATION_DELAY` in `.ralph/config.sh` to make it the project default. The pause is skipped after the final iteration and after any completion/circuit-breaker exit, so it never adds idle time at the end of a run.
+
+### Claude limit backoff
+
+When an engine run exits non-zero and the new log output contains a Claude session/rate-limit message, `loop.sh` retries the same iteration instead of counting it as progress. The retry delay starts at `RALPH_LIMIT_BACKOFF_INITIAL_SECONDS`, doubles after each limit hit, caps at `RALPH_LIMIT_BACKOFF_MAX_SECONDS`, and applies 75-125% jitter. This is not ccrun-only: it also works for normal `claude -p` Ralph loops when the Claude CLI emits a matching limit error.
 
 ### Circuit breaker
 Stops automatically after `RALPH_MAX_STALL` consecutive iterations with no git changes (default: 3).

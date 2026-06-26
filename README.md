@@ -262,6 +262,8 @@ All variables live in `.ralph/config.sh`:
 | `RALPH_TDD` | `false` | Enable Red-Green-Refactor per task |
 | `RALPH_PLAYWRIGHT` | `false` | Enable Playwright MCP browser verification |
 | `RALPH_MAX_STALL` | `3` | Circuit breaker: consecutive no-change iterations |
+| `RALPH_LIMIT_BACKOFF_INITIAL_SECONDS` | `300` | Initial retry delay after a Claude session/rate-limit failure. Applies to `claude -p` and `ccrun` when their failed output matches a limit message. |
+| `RALPH_LIMIT_BACKOFF_MAX_SECONDS` | `5400` | Maximum capped retry delay for Claude limit backoff. Each retry doubles the base delay and adds 75-125% jitter. |
 | `RALPH_ITERATION_DELAY` | `0` | Seconds to sleep between iterations. `0` disables. Override per-run with `--iteration-delay` |
 | `RALPH_VIKUNJA_TASK_ID` | | Vikunja parent task ID |
 | `RALPH_GH_ISSUES` | `false` | Enable GitHub Issues as task source |
@@ -301,6 +303,7 @@ How each engine is invoked per iteration:
 
 Notes:
 - **Model leave-empty = engine default.** With `RALPH_MODEL=""`, codex and opencode use whatever model their own config/auth selects. `claude` falls back to `opus`.
+- **Claude limit backoff.** If `claude -p` or `ccrun` exits non-zero with a Claude session/rate-limit message, the loop retries the same iteration with exponential backoff and jitter using `RALPH_LIMIT_BACKOFF_INITIAL_SECONDS` / `RALPH_LIMIT_BACKOFF_MAX_SECONDS`.
 - **codex sandbox.** By default the loop runs codex fully unattended (the bypass flag), mirroring Claude's `--dangerously-skip-permissions`. Set `RALPH_CODEX_SANDBOX=workspace-write` (or `danger-full-access`) to run sandboxed instead.
 - **MCP-backed extras.** Vikunja and Playwright steps are wired for Claude Code's MCP. codex and opencode support MCP too, but you must configure the equivalent servers in their own config; otherwise those optional steps are simply skipped.
 - **`AGENTS.md`** is the shared backpressure file — all three CLIs read it natively, so the same project works across engines.

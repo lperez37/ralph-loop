@@ -23,6 +23,11 @@ RALPH_COMPLETION_PROMISE=""
 RALPH_TDD="false"
 RALPH_PLAYWRIGHT="false"
 RALPH_MAX_STALL=3
+# Exponential backoff for Claude session/rate-limit failures across engines
+# that surface Claude limits (not just ccrun). On a matching failed engine run,
+# the loop retries the same iteration after this delay, then doubles up to max.
+RALPH_LIMIT_BACKOFF_INITIAL_SECONDS=300
+RALPH_LIMIT_BACKOFF_MAX_SECONDS=5400
 # Pause between iterations in seconds (0 = no pause). Useful for long-running
 # loops to throttle token / subscription usage. Override per-run with
 # --iteration-delay SECONDS.

@@ -178,8 +178,11 @@ LIMIT_BACKOFF_SECONDS="$RALPH_LIMIT_BACKOFF_INITIAL_SECONDS"
 
 is_limit_failure() {
     local offset="$1"
+    # Engine-agnostic Claude limit detection. ccrun wraps the interactive REPL,
+    # while the claude engine uses `claude -p`; both emit human-readable limit
+    # messages on failed runs.
     tail -c +"$((offset + 1))" "$LOG_FILE" 2>/dev/null | grep -Eiq \
-        "ccrun: run failed: limit|You've hit your session limit|You've reached your .* limit|usage limit|rate limit|/rate-limit-options"
+        "ccrun: run failed: limit|You've hit your session limit|You've reached your .* limit|usage limit|rate limit|rate_limit|RateLimitError|too many requests|429|quota exceeded|/rate-limit-options"
 }
 
 sleep_after_limit() {
